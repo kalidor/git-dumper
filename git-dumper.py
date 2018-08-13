@@ -491,7 +491,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--timeout', type=int, default=3,
                         help='maximum time in seconds before giving up')
     parser.add_argument('-s', '--sslnocheck', action='store_false',
-                        help='Don\'t verify SSL certificate')
+                        help='Don\'t perform SSL certificate verification')
     args = parser.parse_args()
 
     # jobs

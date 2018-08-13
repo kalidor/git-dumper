@@ -21,6 +21,7 @@ optional arguments:
                         number of request attempts before giving up
   -t TIMEOUT, --timeout TIMEOUT
                         maximum time in seconds before giving up
+  -s, --sslnocheck      Don't SSL certification verification
 ```
 
 ### Example
