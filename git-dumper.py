@@ -284,7 +284,7 @@ class FindObjectsWorker(DownloadWorker):
         return get_referenced_sha1(obj_file)
 
 
-def fetch_git(url, directory, jobs, retry, timeout):
+def fetch_git(url, directory, jobs, retry, timeout, ssl):
     ''' Dump a git repository into the output directory '''
 
     assert os.path.isdir(directory), '%s is not a directory' % directory
@@ -304,7 +304,7 @@ def fetch_git(url, directory, jobs, retry, timeout):
 
     # check for /.git/HEAD
     printf('[-] Testing %s/.git/HEAD ', url)
-    response = requests.get('%s/.git/HEAD' % url, allow_redirects=False)
+    response = requests.get('%s/.git/HEAD' % url, allow_redirects=False, verify=ssl)
     printf('[%d]\n', response.status_code)
 
     if response.status_code != 200:
@@ -316,7 +316,7 @@ def fetch_git(url, directory, jobs, retry, timeout):
 
     # check for directory listing
     printf('[-] Testing %s/.git/ ', url)
-    response = requests.get('%s/.git/' % url, allow_redirects=False)
+    response = requests.get('%s/.git/' % url, allow_redirects=False, verify=ssl)
     printf('[%d]\n', response.status_code)
 
     if response.status_code == 200 and is_html(response) and 'HEAD' in get_indexed_files(response):
@@ -462,7 +462,7 @@ def fetch_git(url, directory, jobs, retry, timeout):
     process_tasks(objs,
                   FindObjectsWorker,
                   jobs,
-                  args=(url, directory, retry, timeout),
+                  args=(url, directory, retry, timeout, sslnocheck),
                   tasks_done=packed_objs)
 
     # git checkout
@@ -490,6 +490,8 @@ if __name__ == '__main__':
                         help='number of request attempts before giving up')
     parser.add_argument('-t', '--timeout', type=int, default=3,
                         help='maximum time in seconds before giving up')
+    parser.add_argument('-s', '--sslnocheck', action='store_false',
+                        help='Don\'t verify SSL certificate')
     args = parser.parse_args()
 
     # jobs
@@ -522,6 +524,11 @@ if __name__ == '__main__':
 
         if not proxy_valid:
             parser.error('invalid proxy')
+    if args.sslnocheck:
+        print("[+] Check of SSL certificate")
+    else:
+        print("[+] No check of SSL certificate")
+
 
     # output directory
     if not os.path.exists(args.directory):
@@ -534,4 +541,4 @@ if __name__ == '__main__':
         parser.error('%s is not empty' % args.directory)
 
     # fetch everything
-    sys.exit(fetch_git(args.url, args.directory, args.jobs, args.retry, args.timeout))
+    sys.exit(fetch_git(args.url, args.directory, args.jobs, args.retry, args.timeout, args.sslnocheck))
