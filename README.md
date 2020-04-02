@@ -2,6 +2,8 @@
 
 A tool to dump a git repository from a website.
 
+note:You cannot rebuild a git repository if you are not .git/objects
+
 ## Usage
 
 ```
