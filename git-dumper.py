@@ -16,6 +16,9 @@ import dulwich.objects
 import dulwich.pack
 import requests
 import socks
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 def printf(fmt, *args, file=sys.stdout):
@@ -169,11 +172,12 @@ def process_tasks(initial_tasks, worker, jobs, args=(), tasks_done=None):
 class DownloadWorker(Worker):
     ''' Download a list of files '''
 
-    def init(self, url, directory, retry, timeout):
+    def init(self, url, directory, retry, timeout, ssl=True):
         self.session = requests.Session()
+        self.session.verify = ssl
         self.session.mount(url, requests.adapters.HTTPAdapter(max_retries=retry))
 
-    def do_task(self, filepath, url, directory, retry, timeout):
+    def do_task(self, filepath, url, directory, retry, timeout, ssl):
         with closing(self.session.get('%s/%s' % (url, filepath),
                                       allow_redirects=False,
                                       stream=True,
@@ -197,7 +201,7 @@ class DownloadWorker(Worker):
 class RecursiveDownloadWorker(DownloadWorker):
     ''' Download a directory recursively '''
 
-    def do_task(self, filepath, url, directory, retry, timeout):
+    def do_task(self, filepath, url, directory, retry, timeout, ssl):
         with closing(self.session.get('%s/%s' % (url, filepath),
                                       allow_redirects=False,
                                       stream=True,
@@ -231,7 +235,7 @@ class RecursiveDownloadWorker(DownloadWorker):
 class FindRefsWorker(DownloadWorker):
     ''' Find refs/ '''
 
-    def do_task(self, filepath, url, directory, retry, timeout):
+    def do_task(self, filepath, url, directory, retry, timeout, ssl):
         response = self.session.get('%s/%s' % (url, filepath),
                                     allow_redirects=False,
                                     timeout=timeout)
@@ -262,7 +266,7 @@ class FindRefsWorker(DownloadWorker):
 class FindObjectsWorker(DownloadWorker):
     ''' Find objects '''
 
-    def do_task(self, obj, url, directory, retry, timeout):
+    def do_task(self, obj, url, directory, retry, timeout, ssl):
         filepath = '.git/objects/%s/%s' % (obj[:2], obj[2:])
         response = self.session.get('%s/%s' % (url, filepath),
                                     allow_redirects=False,
@@ -324,7 +328,7 @@ def fetch_git(url, directory, jobs, retry, timeout, ssl):
         process_tasks(['.git/', '.gitignore'],
                       RecursiveDownloadWorker,
                       jobs,
-                      args=(url, directory, retry, timeout))
+                      args=(url, directory, retry, timeout, ssl))
 
         printf('[-] Running git checkout .\n')
         os.chdir(directory)
@@ -358,7 +362,7 @@ def fetch_git(url, directory, jobs, retry, timeout, ssl):
     process_tasks(tasks,
                   DownloadWorker,
                   jobs,
-                  args=(url, directory, retry, timeout))
+                  args=(url, directory, retry, timeout, ssl))
 
     # find refs
     printf('[-] Finding refs/\n')
@@ -383,7 +387,7 @@ def fetch_git(url, directory, jobs, retry, timeout, ssl):
     process_tasks(tasks,
                   FindRefsWorker,
                   jobs,
-                  args=(url, directory, retry, timeout))
+                  args=(url, directory, retry, timeout, ssl))
 
     # find packs
     printf('[-] Finding packs\n')
@@ -402,7 +406,7 @@ def fetch_git(url, directory, jobs, retry, timeout, ssl):
     process_tasks(tasks,
                   DownloadWorker,
                   jobs,
-                  args=(url, directory, retry, timeout))
+                  args=(url, directory, retry, timeout, ssl))
 
     # find objects
     printf('[-] Finding objects\n')
@@ -462,7 +466,7 @@ def fetch_git(url, directory, jobs, retry, timeout, ssl):
     process_tasks(objs,
                   FindObjectsWorker,
                   jobs,
-                  args=(url, directory, retry, timeout, sslnocheck),
+                  args=(url, directory, retry, timeout, ssl),
                   tasks_done=packed_objs)
 
     # git checkout
